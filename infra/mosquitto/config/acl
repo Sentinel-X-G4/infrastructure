@@ -1,0 +1,11 @@
+# ESP8266 : publie ses mesures/alertes/acks, lit seulement ses commandes
+user esp01
+topic write sentinelx/esp01/telemetry
+topic write sentinelx/esp01/alert
+topic write sentinelx/esp01/ack
+topic read  sentinelx/esp01/cmd
+
+# Backend IoT : lit tout, envoie les commandes
+user iot-backend
+topic read  sentinelx/#
+topic write sentinelx/+/cmd

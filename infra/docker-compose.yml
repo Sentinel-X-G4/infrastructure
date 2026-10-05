@@ -1,0 +1,73 @@
+name: sentinel-x
+
+# Rotation des logs pour tous les conteneurs (MCO : volume des logs MQTT maîtrisé)
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+  restart: unless-stopped
+  logging: *logging
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    <<: *hardening
+    user: "1883:1883"
+    cap_drop: [ALL]
+    read_only: true
+    ports:
+      - "${BIND_IP:-127.0.0.1}:8883:8883"   # MQTTS uniquement, pas de 1883
+    volumes:
+      - ./mosquitto/config:/mosquitto/config:ro
+      - ./mosquitto/certs:/mosquitto/certs:ro
+      - mosquitto-data:/mosquitto/data
+    networks: [back]
+
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    <<: *hardening
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [data]                          # réseau interne : aucun port exposé
+
+  # --- À brancher par les autres (décommenter quand prêt) ---
+  # iot-backend:   # DEV : s'abonne à sentinelx/#, écrit en base, POST /api/v1/alerts
+  #   build: ../api/iot-backend
+  #   networks: [back, data]
+  # api:           # DEV : REST + WebSocket
+  #   build: ../api
+  #   networks: [front, back, data]
+  # frontend:      # DEV : dashboard
+  #   build: ../frontend
+  #   networks: [front]
+  # proxy:         # Baptiste : reverse proxy TLS, seul point d'entrée HTTP(S)
+  #   ports: ["${BIND_IP:-127.0.0.1}:443:443"]
+  #   networks: [front]
+  # monitoring:    # Paul : prometheus, node-exporter, cadvisor, grafana
+
+networks:
+  front: {}
+  back: {}
+  data:
+    internal: true    # pas d'accès vers l'extérieur
+
+volumes:
+  mosquitto-data: {}
+  pg-data: {}

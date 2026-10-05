@@ -1,0 +1,7 @@
+# Secrets : ne JAMAIS commiter
+.env
+infra/mosquitto/certs/*.key
+infra/mosquitto/certs/*.srl
+infra/mosquitto/config/passwd
+firmware/**/secrets.h
+infra/mosquitto/certs/*.crt
