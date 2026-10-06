@@ -3,10 +3,9 @@
 *.key
 *.pem
 *.srl
-infra/mosquitto/config/password.txt
-infra/mosquitto/config/passwd
-infra/secrets/*
-!infra/secrets/.gitkeep
-infra/mosquitto/certs/*.crt
-infra/nginx/certs/*.crt
-firmware/**/secrets.h
+mosquitto/config/password.txt
+mosquitto/config/passwd
+secrets/*
+!secrets/.gitkeep
+mosquitto/certs/*.crt
+nginx/certs/*.crt

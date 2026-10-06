@@ -3,7 +3,7 @@
 Ce dépôt ne contient que la **configuration** (Nginx, Mosquitto, ACL, scripts, emplacement
 des certificats). Les conteneurs sont déclarés dans le **seul** `docker-compose.yml` du dépôt
 [`main`](https://github.com/Sentinel-X-G4/main), qui monte ces fichiers. La base de données
-est le dépôt [`backend_db`](https://github.com/Sentinel-X-G4/backend_db).
+est le dépôt [`database`](https://github.com/Sentinel-X-G4/database).
 
 | Service (compose de `main`) | Rôle | Exposé |
 |---|---|---|
@@ -15,7 +15,7 @@ Les ports ne sont publiés que sur `BIND_IP` (`192.168.40.1` sur le serveur) : D
 
 ## Arborescence
 ```
-infra/
+infrastructure/
 ├── .env                    # lien vers le .env de main (make init), non commité
 ├── nginx/
 │   ├── nginx.conf
@@ -29,7 +29,7 @@ infra/
 
 ## Installation (depuis `main/`)
 ```bash
-make init        # .env de main, relié ici en infra/.env
+make init        # .env de main, relié ici en .env
 make certs       # PKI de Baptiste (main/secrets/ → make pki), sinon certificats de DEV
 make users       # comptes MQTT hashés (scripts/mqtt-users.sh)
 make up
