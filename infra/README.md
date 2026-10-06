@@ -44,8 +44,11 @@ docker compose up -d && docker compose ps
 
 ## Base de données
 Tout le schéma est dans `postgres/init/` (aucun service ne crée de table) :
-- `01-schema.sql` : tables communes (`measurements`, `alerts`, `commands`)
+- `01-schema.sql` : tables communes (`measurements`, `alerts`, `commands`) ; `alerts` est écrite
+  par le service de détection et lue par backend-api
 - `02-detection.sql` : schéma `detection` du service de détection (mesures brutes, caméra, features, prédictions, sessions)
+- `03-notify.sql` : triggers `NOTIFY` (`sentinel_alerts`, `sentinel_devices`) écoutés par backend-api
+  pour le temps réel (WebSocket)
 
 Ces scripts ne s'exécutent qu'à la **création** du volume `pg-data`. Pour appliquer un
 changement en dev : `docker compose down -v` (efface les données) ; sur une base qui contient

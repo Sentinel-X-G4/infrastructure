@@ -14,10 +14,12 @@ topic write sentinelx/+/cmd
 user vision
 topic write sentinelx/+/camera
 
-# Service de détection (backend-iot-alerts) : lit mesures + caméra, publie ses résultats
+# Service de détection (backend-iot-alerts) : seul abonné aux mesures, à la caméra et aux
+# alertes de l'ESP ; publie ses résultats. Le backend-api ne passe plus par MQTT (base seulement).
 user detection
 topic read  sentinelx/+/telemetry
 topic read  sentinelx/+/camera
+topic read  sentinelx/+/alert
 topic write sentinelx/+/detection
 
 # Simulateur (DEV uniquement : compte créé seulement si MQTT_SIMULATOR_PASSWORD est défini)
