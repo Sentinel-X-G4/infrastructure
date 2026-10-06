@@ -21,7 +21,7 @@ infra/
 ├── mosquitto/
 │   ├── config/             # mosquitto.conf, acl, password.txt (généré, non commité)
 │   └── certs/              # ca.crt, mosquitto.crt, mosquitto.key (Baptiste, non commités)
-├── postgres/init/          # schéma SQL
+├── postgres/init/          # schéma SQL : SEUL endroit où la base est définie
 ├── secrets/                # secrets_sentinel.enc (non commité)
 └── scripts/
 ```
@@ -42,6 +42,15 @@ cp secrets_sentinel.enc secrets/
 docker compose up -d && docker compose ps
 ```
 
+## Base de données
+Tout le schéma est dans `postgres/init/` (aucun service ne crée de table) :
+- `01-schema.sql` : tables communes (`measurements`, `alerts`, `commands`)
+- `02-detection.sql` : schéma `detection` du service de détection (mesures brutes, caméra, features, prédictions, sessions)
+
+Ces scripts ne s'exécutent qu'à la **création** du volume `pg-data`. Pour appliquer un
+changement en dev : `docker compose down -v` (efface les données) ; sur une base qui contient
+des données, ajouter un script `ALTER ...` et l'appliquer à la main avec `psql`.
+
 ## Tests (captures pour le dossier)
 ```bash
 export MSYS_NO_PATHCONV=1; source <(tr -d '\r' < .env)
@@ -56,9 +65,15 @@ curl -k -I https://localhost        # en-têtes de sécurité, pas de version ng
 ```
 
 ## Contrat MQTT
-| Topic | Sens | Exemple |
-|---|---|---|
-| `sentinelx/esp01/telemetry` | ESP → serveur | `{"temp":23.4,"hum":45,"gas":312,"pir":false}` |
-| `sentinelx/esp01/alert` | ESP → serveur | `{"type":"pir","value":true}` |
-| `sentinelx/esp01/cmd` | serveur → ESP | `{"action":"buzzer","state":"on"}` |
-| `sentinelx/esp01/ack` | ESP → serveur | `{"cmd_id":12,"ok":true}` |
+| Topic | Sens | Compte | Exemple |
+|---|---|---|---|
+| `sentinelx/esp01/telemetry` | ESP → serveur (~5 msg/s) | `sentinel_iot` | `{"temp":23.4,"hum":45,"pir":0,"gas_raw":312,"gas_do":1}` |
+| `sentinelx/esp01/alert` | ESP → serveur | `sentinel_iot` | `{"type":"pir","value":true}` |
+| `sentinelx/esp01/cmd` | serveur → ESP | `iot-backend` | `{"action":"buzzer","state":"on"}` |
+| `sentinelx/esp01/ack` | ESP → serveur | `sentinel_iot` | `{"cmd_id":12,"ok":true}` |
+| `sentinelx/esp01/camera` | IA vision → serveur (~1 msg/s) | `vision` | `{"person":true}` |
+| `sentinelx/esp01/detection` | détection → backend | `detection` | statut `feu`/`fuite_gaz`/`presence`/`aucune` + alertes + métriques |
+
+Détail des champs `telemetry`, `camera` et `detection` : `backend-iot-alerts/detection-service/docs/`
+(`MQTT_CONTRACT.md` et `BACKEND_CONTRACT.md`). `pir` et `gas_raw` (ADC brut 0–1023, `gas` accepté)
+sont obligatoires dans `telemetry`.

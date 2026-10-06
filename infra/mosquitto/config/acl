@@ -9,3 +9,18 @@ topic read  sentinelx/esp01/cmd
 user iot-backend
 topic read  sentinelx/#
 topic write sentinelx/+/cmd
+
+# IA vision (human-detection-ia) : publie les détections de personnes
+user vision
+topic write sentinelx/+/camera
+
+# Service de détection (backend-iot-alerts) : lit mesures + caméra, publie ses résultats
+user detection
+topic read  sentinelx/+/telemetry
+topic read  sentinelx/+/camera
+topic write sentinelx/+/detection
+
+# Simulateur (DEV uniquement : compte créé seulement si MQTT_SIMULATOR_PASSWORD est défini)
+user simulator
+topic write sentinelx/+/telemetry
+topic write sentinelx/+/camera
