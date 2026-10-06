@@ -1,38 +1,59 @@
 # Infra Sentinel-X — stack Docker
 
-Mosquitto (MQTTS 8883 uniquement, auth + ACL) + PostgreSQL/TimescaleDB (réseau interne, non exposé).
+| Service | Rôle | Exposé |
+|---|---|---|
+| `sentinel-reverse-proxy` | Nginx, HTTPS forcé, rate limiting, version masquée | `443` (+`80` → redirection) |
+| `sentinel-mosquitto` | Broker MQTT, TLS obligatoire, auth + ACL | `8883` |
+| `sentinel-db` | PostgreSQL/TimescaleDB | non (réseau interne) |
+| `sentinel-backend` / `sentinel-frontend` | DEV (à décommenter) | via le proxy uniquement |
 
-## Démarrer (sur n'importe quel PC avec Docker)
+Réseaux : `sentinel-front` (proxy ↔ appli), `sentinel-back` (backend ↔ MQTT), `sentinel-data` (backend ↔ base, `internal`).
+Les ports ne sont publiés que sur `BIND_IP` (`192.168.40.1` sur le serveur) : Docker contourne UFW.
+
+## Arborescence
+```
+infra/
+├── docker-compose.yml
+├── .env                    # secrets locaux (non commité) ← .env.example
+├── nginx/
+│   ├── nginx.conf
+│   └── certs/              # proxy.crt, proxy.key, dhparam.pem   (Baptiste, non commités)
+├── mosquitto/
+│   ├── config/             # mosquitto.conf, acl, password.txt (généré, non commité)
+│   └── certs/              # ca.crt, mosquitto.crt, mosquitto.key (Baptiste, non commités)
+├── postgres/init/          # schéma SQL
+├── secrets/                # secrets_sentinel.enc (non commité)
+└── scripts/
+```
+
+## Installation
 ```bash
 cd infra
-cp .env.example .env            # puis changer les mots de passe
-./scripts/gen-dev-certs.sh      # CA + cert serveur de DEV (ECDSA P-256)
-./scripts/mqtt-users.sh         # comptes esp01 / iot-backend
-docker compose up -d
-docker compose ps               # postgres doit être "healthy"
+cp .env.example .env                       # remplir les mots de passe
+# 1. Certificats publics de Baptiste
+cp ca.crt mosquitto.crt  mosquitto/certs/
+cp proxy.crt proxy.key dhparam.pem nginx/certs/
+# 2. Clé privée Mosquitto (passphrase demandée à Baptiste, de vive voix)
+cp secrets_sentinel.enc secrets/
+./scripts/decrypt-secrets.sh
+# 3. Comptes MQTT hashés (sentinel_iot = ESP, iot-backend = backend)
+./scripts/mqtt-users.sh
+# 4. Lancement
+docker compose up -d && docker compose ps
 ```
 
-## Tester MQTT sans l'ESP
-Terminal 1 (abonné, joue le backend) :
+## Tests (captures pour le dossier)
 ```bash
-docker compose exec mosquitto mosquitto_sub -h localhost -p 8883 --cafile /mosquitto/certs/ca.crt \
-  -u iot-backend -P <mdp> -t 'sentinelx/#' -v
+export MSYS_NO_PATHCONV=1; source <(tr -d '\r' < .env)
+# abonné (fenêtre 1)
+docker compose exec sentinel-mosquitto mosquitto_sub -h localhost -p 8883 --cafile /mosquitto/certs/ca.crt \
+  -u iot-backend -P "$MQTT_BACKEND_PASSWORD" -t 'sentinelx/#' -v
+# ESP simulé (fenêtre 2)
+docker compose exec sentinel-mosquitto mosquitto_pub -h localhost -p 8883 --cafile /mosquitto/certs/ca.crt \
+  -u sentinel_iot -P "$MQTT_ESP_PASSWORD" -t sentinelx/esp01/telemetry -m '{"temp":23.4,"gas":312}'
+# proxy
+curl -k -I https://localhost        # en-têtes de sécurité, pas de version nginx
 ```
-Terminal 2 (publie, joue l'ESP) :
-```bash
-docker compose exec mosquitto mosquitto_pub -h localhost -p 8883 --cafile /mosquitto/certs/ca.crt \
-  -u esp01 -P <mdp> -t sentinelx/esp01/telemetry -m '{"temp":23.4,"hum":45,"gas":312,"pir":false}'
-```
-
-Tests à faire (et à capturer pour le dossier) :
-- connexion sans mot de passe → refusée
-- port 1883 → fermé (`nc -zv localhost 1883`)
-- `esp01` qui publie sur `sentinelx/esp01/cmd` → ignoré (ACL)
-- `docker compose exec postgres psql -U sentinel -c '\dt'` → 3 tables
-
-## Sur le PC serveur
-Dans `.env` : `BIND_IP=192.168.40.1` → les ports ne sont publiés que sur le Wi-Fi de table
-(Docker contourne UFW, d'où ce binding explicite).
 
 ## Contrat MQTT
 | Topic | Sens | Exemple |

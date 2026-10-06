@@ -1,35 +1,60 @@
 name: sentinel-x
 
-# Rotation des logs pour tous les conteneurs (MCO : volume des logs MQTT maîtrisé)
-x-logging: &logging
+# ---------------------------------------------------------------------------
+# Sentinel-X — stack serveur (PC Serveur Local, Wi-Fi de table 192.168.40.0/24)
+# Ports publiés UNIQUEMENT sur ${BIND_IP} (192.168.40.1 en prod) :
+#   443/80 -> reverse proxy (dashboard + API)     8883 -> Mosquitto (MQTTS)
+# Tout le reste reste sur des réseaux Docker internes.
+# ---------------------------------------------------------------------------
+
+x-logging: &logging           # MCO : logs plafonnés (3 x 10 Mo par conteneur)
   driver: json-file
-  options:
-    max-size: "10m"
-    max-file: "3"
+  options: { max-size: "10m", max-file: "3" }
 
 x-hardening: &hardening
-  security_opt:
-    - no-new-privileges:true
   restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]
   logging: *logging
 
 services:
-  mosquitto:
-    image: eclipse-mosquitto:2
+
+  # ---------- Point d'entrée HTTP(S) unique (Baptiste) ----------
+  sentinel-reverse-proxy:
+    image: nginx:1.27-alpine
+    container_name: sentinel-reverse-proxy
     <<: *hardening
-    user: "1883:1883"
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE, CHOWN, SETUID, SETGID]
+    read_only: true
+    tmpfs: [/var/cache/nginx, /var/run, /tmp]
+    ports:
+      - "${BIND_IP:-127.0.0.1}:443:443"
+      - "${BIND_IP:-127.0.0.1}:80:80"          # redirige seulement vers 443
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    networks: [sentinel-front]
+
+  # ---------- Broker MQTT (TLS 8883 uniquement) ----------
+  sentinel-mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: sentinel-mosquitto
+    <<: *hardening
+    user: "1883:1883"                          # non-root (voir README)
     cap_drop: [ALL]
     read_only: true
     ports:
-      - "${BIND_IP:-127.0.0.1}:8883:8883"   # MQTTS uniquement, pas de 1883
+      - "${BIND_IP:-127.0.0.1}:8883:8883"
     volumes:
       - ./mosquitto/config:/mosquitto/config:ro
       - ./mosquitto/certs:/mosquitto/certs:ro
       - mosquitto-data:/mosquitto/data
-    networks: [back]
+    networks: [sentinel-back]
 
-  postgres:
+  # ---------- Base de données (jamais exposée) ----------
+  sentinel-db:
     image: timescale/timescaledb:latest-pg16
+    container_name: sentinel-db
     <<: *hardening
     cap_drop: [ALL]
     cap_add: [CHOWN, SETUID, SETGID, DAC_OVERRIDE, FOWNER]
@@ -45,28 +70,41 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    networks: [data]                          # réseau interne : aucun port exposé
+    networks: [sentinel-data]
 
-  # --- À brancher par les autres (décommenter quand prêt) ---
-  # iot-backend:   # DEV : s'abonne à sentinelx/#, écrit en base, POST /api/v1/alerts
-  #   build: ../api/iot-backend
-  #   networks: [back, data]
-  # api:           # DEV : REST + WebSocket
+  # ---------- Conteneurs DEV / IA : décommenter quand le code existe ----------
+  # sentinel-backend:            # API REST + WebSocket (POST /api/v1/alerts)
   #   build: ../api
-  #   networks: [front, back, data]
-  # frontend:      # DEV : dashboard
+  #   container_name: sentinel-backend
+  #   <<: *hardening
+  #   environment:
+  #     DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@sentinel-db:5432/${POSTGRES_DB}
+  #     MQTT_HOST: sentinel-mosquitto
+  #     MQTT_PORT: 8883
+  #     MQTT_USER: iot-backend
+  #     MQTT_PASSWORD: ${MQTT_BACKEND_PASSWORD}
+  #     MQTT_CA: /certs/ca.crt
+  #   volumes:
+  #     - ./mosquitto/certs/ca.crt:/certs/ca.crt:ro
+  #   depends_on:
+  #     sentinel-db: { condition: service_healthy }
+  #     sentinel-mosquitto: { condition: service_started }
+  #   networks: [sentinel-front, sentinel-back, sentinel-data]
+  #
+  # sentinel-frontend:           # Dashboard web
   #   build: ../frontend
-  #   networks: [front]
-  # proxy:         # Baptiste : reverse proxy TLS, seul point d'entrée HTTP(S)
-  #   ports: ["${BIND_IP:-127.0.0.1}:443:443"]
-  #   networks: [front]
-  # monitoring:    # Paul : prometheus, node-exporter, cadvisor, grafana
+  #   container_name: sentinel-frontend
+  #   <<: *hardening
+  #   networks: [sentinel-front]
 
 networks:
-  front: {}
-  back: {}
-  data:
-    internal: true    # pas d'accès vers l'extérieur
+  sentinel-front:                # proxy <-> backend/frontend
+    driver: bridge
+  sentinel-back:                 # backend <-> mosquitto
+    driver: bridge
+  sentinel-data:                 # backend <-> base : aucun accès extérieur
+    driver: bridge
+    internal: true
 
 volumes:
   mosquitto-data: {}

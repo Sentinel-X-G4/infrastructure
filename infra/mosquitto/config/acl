@@ -1,5 +1,5 @@
-# ESP8266 : publie ses mesures/alertes/acks, lit seulement ses commandes
-user esp01
+# ESP8266 (compte sentinel_iot) : publie mesures/alertes/acks, lit seulement ses commandes
+user sentinel_iot
 topic write sentinelx/esp01/telemetry
 topic write sentinelx/esp01/alert
 topic write sentinelx/esp01/ack
