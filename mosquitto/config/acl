@@ -5,22 +5,24 @@ topic write sentinelx/esp01/alert
 topic write sentinelx/esp01/ack
 topic read  sentinelx/esp01/cmd
 
-# Backend IoT : lit tout, envoie les commandes
+# Debug (mosquitto_sub) : lecture seule, utilisé par aucun service
 user iot-backend
 topic read  sentinelx/#
-topic write sentinelx/+/cmd
 
 # IA vision (human-detection-ia) : publie les détections de personnes
 user vision
 topic write sentinelx/+/camera
 
-# Service de détection (backend-iot-alerts) : seul abonné aux mesures, à la caméra et aux
-# alertes de l'ESP ; publie ses résultats. Le backend-api ne passe plus par MQTT (base seulement).
+# Service de détection (backend-iot-alerts) : seul service serveur sur MQTT. Abonné aux mesures,
+# à la caméra et aux alertes de l'ESP ; publie ses résultats et les commandes vers les ESP (relayées
+# depuis backend-api en HTTP), dont il lit les acquittements.
 user detection
 topic read  sentinelx/+/telemetry
 topic read  sentinelx/+/camera
 topic read  sentinelx/+/alert
 topic write sentinelx/+/detection
+topic write sentinelx/+/cmd
+topic read  sentinelx/+/ack
 
 # Simulateur (DEV uniquement : compte créé seulement si MQTT_SIMULATOR_PASSWORD est défini)
 user simulator

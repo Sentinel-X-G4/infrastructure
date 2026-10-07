@@ -55,9 +55,9 @@ curl -k -I https://localhost        # en-têtes de sécurité, pas de version ng
 | Topic | Sens | Compte | Exemple |
 |---|---|---|---|
 | `sentinelx/esp01/telemetry` | ESP → serveur (~5 msg/s) | `sentinel_iot` | `{"temp":23.4,"hum":45,"pir":0,"gas_raw":312,"gas_do":1}` |
-| `sentinelx/esp01/alert` | ESP → serveur | `sentinel_iot` | `{"type":"pir","value":true}` |
-| `sentinelx/esp01/cmd` | serveur → ESP | `iot-backend` | `{"action":"buzzer","state":"on"}` |
-| `sentinelx/esp01/ack` | ESP → serveur | `sentinel_iot` | `{"cmd_id":12,"ok":true}` |
+| `sentinelx/esp01/alert` | ESP → serveur (plus publié par le firmware actuel) | `sentinel_iot` | `{"type":"pir","value":true}` |
+| `sentinelx/esp01/cmd` | détection → ESP | `detection` | `{"id":"<uuid>","command":"buzzer","state":"on"}` |
+| `sentinelx/esp01/ack` | ESP → détection | `sentinel_iot` | `{"id":"<uuid>","command":"buzzer","ok":true,"state":{…}}` |
 | `sentinelx/esp01/camera` | IA vision → serveur (~1 msg/s) | `vision` | `{"person":true}` |
 | `sentinelx/esp01/detection` | détection → backend | `detection` | statut `feu`/`fuite_gaz`/`presence`/`aucune` + alertes + métriques |
 
