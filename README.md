@@ -10,7 +10,8 @@ est le dépôt [`database`](https://github.com/Sentinel-X-G4/database).
 | `sentinel-reverse-proxy` | Nginx, HTTPS forcé, rate limiting, version masquée | `443` (+`80` → redirection) |
 | `sentinel-mosquitto` | Broker MQTT, TLS obligatoire, auth + ACL | `8883` |
 
-Réseaux : `sentinel-front` (proxy ↔ appli), `sentinel-back` (backend ↔ MQTT), `sentinel-data` (backend ↔ base, `internal`).
+Réseaux : `sentinel-front` (proxy ↔ appli), `sentinel-back` (détection, vision ↔ MQTT), `sentinel-data` (services ↔ base, `internal`),
+`sentinel-vision` (backend-api ↔ API des visages, `internal`), `sentinel-monitoring` (Grafana).
 Les ports ne sont publiés que sur `BIND_IP` (`192.168.40.1` sur le serveur) : Docker contourne UFW.
 
 ## Arborescence
@@ -46,7 +47,7 @@ docker compose exec sentinel-mosquitto mosquitto_sub -h localhost -p 8883 --cafi
   -u iot-backend -P "$MQTT_BACKEND_PASSWORD" -t 'sentinelx/#' -v
 # ESP simulé (fenêtre 2)
 docker compose exec sentinel-mosquitto mosquitto_pub -h localhost -p 8883 --cafile /mosquitto/certs/ca.crt \
-  -u sentinel_iot -P "$MQTT_ESP_PASSWORD" -t sentinelx/esp01/telemetry -m '{"temp":23.4,"gas":312}'
+  -u sentinel_iot -P "$MQTT_ESP_PASSWORD" -t sentinelx/esp01/telemetry -m '{"temp":23.4,"hum":45,"pir":0,"gas_raw":312,"gas_do":0}'
 # proxy
 curl -k -I https://localhost        # en-têtes de sécurité, pas de version nginx
 ```
