@@ -59,7 +59,7 @@ curl -k -I https://localhost        # en-têtes de sécurité, pas de version ng
 | `sentinelx/esp01/cmd` | détection → ESP | `detection` | `{"id":"<uuid>","command":"buzzer","state":"on"}` |
 | `sentinelx/esp01/ack` | ESP → détection | `sentinel_iot` | `{"id":"<uuid>","command":"buzzer","ok":true,"state":{…}}` |
 | `sentinelx/esp01/camera` | IA vision → serveur (~1 msg/s) | `vision` | `{"person":true}` |
-| `sentinelx/esp01/detection` | détection → backend | `detection` | statut `feu`/`fuite_gaz`/`presence`/`aucune` + alertes + métriques |
+| `sentinelx/esp01/detection` | détection → backend | `detection` | statut `feu`/`fuite_gaz`/`inondation`/`presence`/`aucune` + alertes + métriques |
 
 Détail des champs `telemetry`, `camera` et `detection` : `backend-iot-alerts/detection-service/docs/`
 (`MQTT_CONTRACT.md` et `BACKEND_CONTRACT.md`). `pir` et `gas_raw` (ADC brut 0–1023, `gas` accepté)
